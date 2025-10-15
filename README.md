@@ -15,7 +15,9 @@
 
 ## 🚀 快速体验 / Quick Experience
 
-**本地运行体验**: 直接用浏览器打开 `index.html` 文件即可体验演示功能
+**[在线演示 / Live Demo](https://dmatrader.github.io/btc-orderflow-monitor/)**
+
+**本地运行**: 直接用浏览器打开 `index.html` 文件即可体验演示功能
 
 ## ✨ 功能特性 / Features
 
@@ -29,6 +31,11 @@
 ## 📖 使用说明 / Usage
 
 ### 快速开始
+
+**方法1：在线体验**
+- 直接访问：[在线演示](https://dmatrader.github.io/btc-orderflow-monitor/)
+
+**方法2：本地运行**
 ```bash
 # 1. 下载项目文件
 git clone https://github.com/dmatrader/btc-orderflow-monitor.git
@@ -66,18 +73,6 @@ python -m http.server 8000
 - **OKX合约**: WebSocket实时订单流数据
 - **数据格式**: 买卖订单、价格、数量、时间戳
 - **更新频率**: 实时推送
-
-## 🔔 关注我们 / Follow Us
-
-### 📢 币安合约异动告警群
-**实时监控币安全部合约异动，可定制币对范围和涨跌幅提醒阈值**
-
-- **Telegram频道**: 
-- **功能**: 7年稳定返佣渠道，机器人可定制提醒
-- **邀请码**: 
-  - 币安: `MAPAMBQ1` (手续费永久返还)
-  - OKX: `TRADER8` (手续费永久返还)
-  - Bitget: `TRADER8` (手续费永久返还)
 
 ## 🔗 相关链接 / Related Links
 
