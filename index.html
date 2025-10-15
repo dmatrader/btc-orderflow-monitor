@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC订单流监控 - 币安 & OKX</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #d3d3d3;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
+            border-radius: 6px;
+            border: 1px solid #444;
+        }
+
+        .header h1 {
+            color: #00d4aa;
+            font-size: 1.2em;
+            margin-bottom: 2px;
+            text-shadow: 0 0 5px rgba(0, 212, 170, 0.3);
+        }
+
+        .header p {
+            color: #888;
+            font-size: 0.6em;
+        }
+
+        .exchanges-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .exchange-panel {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .exchange-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4aa, #0099cc);
+        }
+
+        .exchange-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+
+        .exchange-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #00d4aa;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #00d4aa;
+        }
+
+        .status-indicator.disconnected {
+            background: #ff4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .price-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .price-card {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #555;
+            text-align: center;
+        }
+
+        .price-label {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .price-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #d3d3d3;
+        }
+
+        .price-value.positive {
+            color: #00d4aa;
+        }
+
+        .price-value.negative {
+            color: #ff4444;
+        }
+
+        .orderflow-panel {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .orderflow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .orderflow-title {
+            font-size: 1.2em;
+            color: #00d4aa;
+            font-weight: bold;
+        }
+
+        .orderflow-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .delay-input {
+            width: 80px;
+            background: #333;
+            color: #d3d3d3;
+            border: 1px solid #555;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .best-quote {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #2a2a2a;
+            border-radius: 6px;
+        }
+
+        .quote-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .quote-label {
+            color: #888;
+            font-size: 0.9em;
+            width: 25px;
+            text-align: left;
+        }
+
+        .quote-price {
+            font-weight: bold;
+            width: 80px;
+            text-align: right;
+        }
+
+        .quote-price.bid {
+            color: #00C800;
+        }
+
+        .quote-price.ask {
+            color: #FF0000;
+        }
+
+        .quote-notional {
+            font-size: 0.8em;
+            width: 120px;
+            text-align: right;
+        }
+
+        .quote-notional.bid {
+            color: #00C800;
+        }
+
+        .quote-notional.ask {
+            color: #FF0000;
+        }
+
+        .quote-separator {
+            color: #555;
+            font-size: 1.2em;
+        }
+
+        .peak-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            margin: 8px 0;
+            padding: 8px;
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .peak-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .peak-label {
+            color: #888;
+            font-size: 0.8em;
+        }
+
+        .peak-value {
+            font-weight: bold;
+            color: #d3d3d3;
+        }
+
+        .peak-separator {
+            color: #555;
+            font-size: 1.1em;
+        }
+
+        .window-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 8px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            border: 1px solid #444;
+        }
+
+        .window-input {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .window-input label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .window-input-field {
+            width: 60px;
+            background: #333;
+            color: #d3d3d3;
+            border: 1px solid #555;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .amount-filter {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .amount-filter label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .amount-input {
+            width: 80px;
+            background: #333;
+            color: #d3d3d3;
+            border: 1px solid #555;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .orderflow-analysis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .analysis-window {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .window-title {
+            font-size: 1em;
+            color: #00d4aa;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #444;
+        }
+
+        .flow-stats, .count-stats {
+            margin-bottom: 10px;
+        }
+
+        .flow-item, .count-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .flow-label, .count-label {
+            color: #888;
+            font-size: 0.8em;
+        }
+
+        .flow-value, .count-value {
+            font-weight: bold;
+            color: #d3d3d3;
+        }
+
+        .flow-value.positive {
+            color: #00d4aa;
+        }
+
+        .flow-value.negative {
+            color: #ff4444;
+        }
+
+        .count-value.positive {
+            color: #00d4aa;
+        }
+
+        .count-value.negative {
+            color: #ff4444;
+        }
+
+        .flow-ratio, .count-ratio {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-fill.buy-dominant {
+            background: linear-gradient(90deg, #00d4aa, #00a085);
+        }
+
+        .progress-fill.sell-dominant {
+            background: linear-gradient(90deg, #ff4444, #cc3333);
+        }
+
+        .ratio-text {
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #d3d3d3;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        .orderflow-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: #333;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #555;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #d3d3d3;
+        }
+
+        .trades-panel {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            height: 180px;
+            overflow-y: auto;
+        }
+
+        .trades-header {
+            font-size: 1.1em;
+            color: #00d4aa;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .trades-threshold {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .trades-threshold label {
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .trades-threshold input {
+            width: 80px;
+            padding: 2px 6px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 3px;
+            color: #d3d3d3;
+            font-size: 0.9em;
+        }
+
+        .trades-threshold input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .trade-empty {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            padding: 20px;
+        }
+
+        .liquidation-panel {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            height: 180px;
+            overflow-y: auto;
+        }
+
+        .liquidation-header {
+            font-size: 1.1em;
+            color: #00d4aa;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .liquidation-threshold {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .liquidation-threshold label {
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .liquidation-threshold input {
+            width: 80px;
+            padding: 2px 6px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 3px;
+            color: #d3d3d3;
+            font-size: 0.9em;
+        }
+
+        .liquidation-threshold input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .liquidation-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+            font-size: 0.9em;
+        }
+
+        .liquidation-item:last-child {
+            border-bottom: none;
+        }
+
+        .liquidation-direction {
+            font-weight: bold;
+            min-width: 80px;
+        }
+
+        .liquidation-direction.long {
+            color: #FF0000;
+        }
+
+        .liquidation-direction.short {
+            color: #00C800;
+        }
+
+        .liquidation-price {
+            color: #d3d3d3;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .liquidation-amount {
+            color: #d3d3d3;
+            min-width: 100px;
+            text-align: right;
+        }
+
+        .liquidation-time {
+            color: #888;
+            font-size: 0.8em;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .liquidation-empty {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            padding: 20px;
+        }
+
+        .trade-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+            font-size: 0.9em;
+        }
+
+        .trade-item:last-child {
+            border-bottom: none;
+        }
+
+        .trade-side {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+
+        .trade-side.buy {
+            background: #00d4aa;
+            color: #000;
+        }
+
+        .trade-side.sell {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .trade-price {
+            font-weight: bold;
+            color: #d3d3d3;
+        }
+
+        .trade-size {
+            color: #888;
+        }
+
+        .trade-time {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        .funding-info {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .funding-header {
+            font-size: 1.1em;
+            color: #00d4aa;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .funding-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .funding-card {
+            background: #333;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #555;
+        }
+
+        .funding-label {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .funding-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #d3d3d3;
+        }
+
+        .funding-value.positive {
+            color: #00d4aa;
+        }
+
+        .funding-value.negative {
+            color: #ff4444;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .exchanges-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .price-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .orderflow-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .funding-details {
+                grid-template-columns: 1fr;
+            }
+            
+            .orderflow-analysis {
+                grid-template-columns: 1fr;
+            }
+            
+            .window-controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            .window-input, .amount-filter {
+                justify-content: space-between;
+            }
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2a2a2a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>BTC订单流监控</h1>
+            <p>实时监控币安合约与OKX合约的BTCUSDT交易数据</p>
+        </div>
+
+        <div class="exchanges-grid">
+            <!-- 币安合约面板 -->
+            <div class="exchange-panel" id="binance-panel">
+                <div class="exchange-header">
+                    <div class="exchange-name">币安合约</div>
+                    <div class="connection-status">
+                        <div class="status-indicator" id="binance-status"></div>
+                        <span id="binance-status-text">连接中...</span>
+                    </div>
+                </div>
+
+                <div class="price-info">
+                    <div class="price-card">
+                        <div class="price-label">最新价格</div>
+                        <div class="price-value" id="binance-price">--</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">延迟</div>
+                        <div class="price-value" id="binance-latency">--</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">标记价格</div>
+                        <div class="price-value" id="binance-mark-price">--</div>
+                    </div>
+                </div>
+
+                <div class="orderflow-panel">
+                    <div class="orderflow-header">
+                        <div class="orderflow-title">订单流监控</div>
+                        <div class="orderflow-controls">
+                            <label>停滞时间(ms):</label>
+                            <input type="number" class="delay-input" id="binance-delay" value="3000" min="0" step="500" max="60000">
+                        </div>
+                    </div>
+                    
+                    <div class="best-quote">
+                        <div class="quote-section">
+                            <span class="quote-label">BB:</span>
+                            <span class="quote-price" id="binance-bid-price">--</span>
+                            <span class="quote-notional" id="binance-bid-size">--</span>
+                        </div>
+                        <div class="quote-separator">|</div>
+                        <div class="quote-section">
+                            <span class="quote-label">BA:</span>
+                            <span class="quote-price" id="binance-ask-price">--</span>
+                            <span class="quote-notional" id="binance-ask-size">--</span>
+                        </div>
+                    </div>
+
+                    <div class="peak-info">
+                        <div class="peak-section">
+                            <span class="peak-label">峰值:</span>
+                            <span class="peak-value" id="binance-bid-peak">-- N/A U</span>
+                        </div>
+                        <div class="peak-separator">|</div>
+                        <div class="peak-section">
+                            <span class="peak-label">峰值:</span>
+                            <span class="peak-value" id="binance-ask-peak">-- N/A U</span>
+                        </div>
+                    </div>
+
+                    <div class="window-controls">
+                        <div class="window-input">
+                            <label>窗 1(s):</label>
+                            <input type="number" class="window-input-field" id="binance-window1" value="10" min="1" max="300">
+                        </div>
+                        <div class="window-input">
+                            <label>窗 2(s):</label>
+                            <input type="number" class="window-input-field" id="binance-window2" value="60" min="1" max="300">
+                        </div>
+                        <div class="amount-filter">
+                            <label>金额:</label>
+                            <input type="number" class="amount-input" id="binance-amount-filter" value="900" min="0" step="100">
+                        </div>
+                    </div>
+
+                    <div class="orderflow-analysis">
+                        <div class="analysis-window">
+                            <div class="window-title">10s窗口</div>
+                            <div class="flow-stats">
+                                <div class="flow-item">
+                                    <div class="flow-label">净主动流:</div>
+                                    <div class="flow-value" id="binance-net-flow-10s">-- U</div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">主动买占比:</div>
+                                    <div class="flow-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="binance-buy-ratio-10s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="binance-buy-ratio-text-10s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">总成交:</div>
+                                    <div class="flow-value" id="binance-total-10s">-- U</div>
+                                </div>
+                            </div>
+                            <div class="count-stats">
+                                <div class="count-item">
+                                    <div class="count-label">净主动笔数:</div>
+                                    <div class="count-value" id="binance-net-count-10s">-- 笔</div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">主动笔占比:</div>
+                                    <div class="count-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="binance-count-ratio-10s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="binance-count-ratio-text-10s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">总笔数:</div>
+                                    <div class="count-value" id="binance-total-count-10s">--</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-window">
+                            <div class="window-title">60s窗口</div>
+                            <div class="flow-stats">
+                                <div class="flow-item">
+                                    <div class="flow-label">净主动流:</div>
+                                    <div class="flow-value" id="binance-net-flow-60s">-- U</div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">主动买占比:</div>
+                                    <div class="flow-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="binance-buy-ratio-60s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="binance-buy-ratio-text-60s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">总成交:</div>
+                                    <div class="flow-value" id="binance-total-60s">-- U</div>
+                                </div>
+                            </div>
+                            <div class="count-stats">
+                                <div class="count-item">
+                                    <div class="count-label">净主动笔数:</div>
+                                    <div class="count-value" id="binance-net-count-60s">-- 笔</div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">主动笔占比:</div>
+                                    <div class="count-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="binance-count-ratio-60s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="binance-count-ratio-text-60s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">总笔数:</div>
+                                    <div class="count-value" id="binance-total-count-60s">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trades-panel">
+                    <div class="trades-header">
+                        <span>最近成交</span>
+                        <div class="trades-threshold">
+                            <label>阈值:</label>
+                            <input type="number" id="binance-trades-threshold" value="10000" min="0" step="1000" placeholder="U">
+                        </div>
+                    </div>
+                    <div id="binance-trades"></div>
+                </div>
+
+                <div class="funding-info">
+                    <div class="funding-header">资金费率信息</div>
+                    <div class="funding-details">
+                        <div class="funding-card">
+                            <div class="funding-label">当前费率</div>
+                            <div class="funding-value" id="binance-funding-rate">--</div>
+                        </div>
+                        <div class="funding-card">
+                            <div class="funding-label">年化费率</div>
+                            <div class="funding-value" id="binance-annual-rate">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="liquidation-panel">
+                    <div class="liquidation-header">
+                        <span>BTC爆仓监控</span>
+                        <div class="liquidation-threshold">
+                            <label>阈值:</label>
+                            <input type="number" id="binance-liquidation-threshold" value="0" min="0" step="100" placeholder="U">
+                        </div>
+                    </div>
+                    <div id="binance-liquidations"></div>
+                </div>
+            </div>
+
+            <!-- OKX合约面板 -->
+            <div class="exchange-panel" id="okx-panel">
+                <div class="exchange-header">
+                    <div class="exchange-name">OKX合约</div>
+                    <div class="connection-status">
+                        <div class="status-indicator" id="okx-status"></div>
+                        <span id="okx-status-text">连接中...</span>
+                    </div>
+                </div>
+
+                <div class="price-info">
+                    <div class="price-card">
+                        <div class="price-label">最新价格</div>
+                        <div class="price-value" id="okx-price">--</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">延迟</div>
+                        <div class="price-value" id="okx-latency">--</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">标记价格</div>
+                        <div class="price-value" id="okx-mark-price">--</div>
+                    </div>
+                </div>
+
+                <div class="orderflow-panel">
+                    <div class="orderflow-header">
+                        <div class="orderflow-title">订单流监控</div>
+                        <div class="orderflow-controls">
+                            <label>停滞时间(ms):</label>
+                            <input type="number" class="delay-input" id="okx-delay" value="3000" min="0" step="500" max="60000">
+                        </div>
+                    </div>
+                    
+                    <div class="best-quote">
+                        <div class="quote-section">
+                            <span class="quote-label">BB:</span>
+                            <span class="quote-price" id="okx-bid-price">--</span>
+                            <span class="quote-notional" id="okx-bid-size">--</span>
+                        </div>
+                        <div class="quote-separator">|</div>
+                        <div class="quote-section">
+                            <span class="quote-label">BA:</span>
+                            <span class="quote-price" id="okx-ask-price">--</span>
+                            <span class="quote-notional" id="okx-ask-size">--</span>
+                        </div>
+                    </div>
+
+                    <div class="peak-info">
+                        <div class="peak-section">
+                            <span class="peak-label">峰值:</span>
+                            <span class="peak-value" id="okx-bid-peak">-- N/A U</span>
+                        </div>
+                        <div class="peak-separator">|</div>
+                        <div class="peak-section">
+                            <span class="peak-label">峰值:</span>
+                            <span class="peak-value" id="okx-ask-peak">-- N/A U</span>
+                        </div>
+                    </div>
+
+                    <div class="window-controls">
+                        <div class="window-input">
+                            <label>窗 1(s):</label>
+                            <input type="number" class="window-input-field" id="okx-window1" value="10" min="1" max="300">
+                        </div>
+                        <div class="window-input">
+                            <label>窗 2(s):</label>
+                            <input type="number" class="window-input-field" id="okx-window2" value="60" min="1" max="300">
+                        </div>
+                        <div class="amount-filter">
+                            <label>金额:</label>
+                            <input type="number" class="amount-input" id="okx-amount-filter" value="900" min="0" step="100">
+                        </div>
+                    </div>
+
+                    <div class="orderflow-analysis">
+                        <div class="analysis-window">
+                            <div class="window-title">10s窗口</div>
+                            <div class="flow-stats">
+                                <div class="flow-item">
+                                    <div class="flow-label">净主动流:</div>
+                                    <div class="flow-value" id="okx-net-flow-10s">-- U</div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">主动买占比:</div>
+                                    <div class="flow-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="okx-buy-ratio-10s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="okx-buy-ratio-text-10s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">总成交:</div>
+                                    <div class="flow-value" id="okx-total-10s">-- U</div>
+                                </div>
+                            </div>
+                            <div class="count-stats">
+                                <div class="count-item">
+                                    <div class="count-label">净主动笔数:</div>
+                                    <div class="count-value" id="okx-net-count-10s">-- 笔</div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">主动笔占比:</div>
+                                    <div class="count-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="okx-count-ratio-10s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="okx-count-ratio-text-10s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">总笔数:</div>
+                                    <div class="count-value" id="okx-total-count-10s">--</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-window">
+                            <div class="window-title">60s窗口</div>
+                            <div class="flow-stats">
+                                <div class="flow-item">
+                                    <div class="flow-label">净主动流:</div>
+                                    <div class="flow-value" id="okx-net-flow-60s">-- U</div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">主动买占比:</div>
+                                    <div class="flow-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="okx-buy-ratio-60s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="okx-buy-ratio-text-60s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="flow-item">
+                                    <div class="flow-label">总成交:</div>
+                                    <div class="flow-value" id="okx-total-60s">-- U</div>
+                                </div>
+                            </div>
+                            <div class="count-stats">
+                                <div class="count-item">
+                                    <div class="count-label">净主动笔数:</div>
+                                    <div class="count-value" id="okx-net-count-60s">-- 笔</div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">主动笔占比:</div>
+                                    <div class="count-ratio">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="okx-count-ratio-60s"></div>
+                                        </div>
+                                        <span class="ratio-text" id="okx-count-ratio-text-60s">--%</span>
+                                    </div>
+                                </div>
+                                <div class="count-item">
+                                    <div class="count-label">总笔数:</div>
+                                    <div class="count-value" id="okx-total-count-60s">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="trades-panel">
+                    <div class="trades-header">
+                        <span>最近成交</span>
+                        <div class="trades-threshold">
+                            <label>阈值:</label>
+                            <input type="number" id="okx-trades-threshold" value="10000" min="0" step="1000" placeholder="U">
+                        </div>
+                    </div>
+                    <div id="okx-trades"></div>
+                </div>
+
+                <div class="funding-info">
+                    <div class="funding-header">资金费率信息</div>
+                    <div class="funding-details">
+                        <div class="funding-card">
+                            <div class="funding-label">当前费率</div>
+                            <div class="funding-value" id="okx-funding-rate">--</div>
+                        </div>
+                        <div class="funding-card">
+                            <div class="funding-label">年化费率</div>
+                            <div class="funding-value" id="okx-annual-rate">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="liquidation-panel">
+                    <div class="liquidation-header">
+                        <span>BTC爆仓监控</span>
+                        <div class="liquidation-threshold">
+                            <label>阈值:</label>
+                            <input type="number" id="okx-liquidation-threshold" value="0" min="0" step="100" placeholder="U">
+                        </div>
+                    </div>
+                    <div id="okx-liquidations"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>BTC订单流监控系统 - 实时数据展示 | 币安合约 & OKX合约</p>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let binanceWs = null;
+        let okxWs = null;
+        let binanceData = {
+            price: 0,
+            latency: 0,
+            markPrice: 0,
+            bidPrice: 0,
+            askPrice: 0,
+            bidSize: 0,
+            askSize: 0,
+            fundingRate: 0,
+            nextFundingTime: 0,
+            trades: [],
+            liquidations: [],
+            maxBuy: 0,
+            maxSell: 0,
+            totalVolume: 0,
+            bidPeak: 0,
+            askPeak: 0,
+            window1: 10,
+            window2: 60,
+            amountFilter: 900
+        };
+        let okxData = {
+            price: 0,
+            latency: 0,
+            markPrice: 0,
+            bidPrice: 0,
+            askPrice: 0,
+            bidSize: 0,
+            askSize: 0,
+            fundingRate: 0,
+            nextFundingTime: 0,
+            trades: [],
+            liquidations: [],
+            maxBuy: 0,
+            maxSell: 0,
+            totalVolume: 0,
+            bidPeak: 0,
+            askPeak: 0,
+            window1: 10,
+            window2: 60,
+            amountFilter: 900
+        };
+
+        // 格式化价格 - BTC固定1位小数
+        function formatPrice(price) {
+            if (!price || isNaN(price)) return '--';
+            return parseFloat(price).toFixed(1);
+        }
+
+        // 格式化数量 - 显示完整数字，不简略
+        function formatSize(size) {
+            if (!size || isNaN(size)) return '--';
+            return Math.round(size).toLocaleString('en-US');
+        }
+
+        // 格式化资金费率
+        function formatFundingRate(rate) {
+            if (!rate || isNaN(rate)) return '--';
+            return (rate * 100).toFixed(4) + '%';
+        }
+
+        // 格式化时间
+        function formatTime(timestamp) {
+            if (!timestamp) return '--';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        // 更新连接状态
+        function updateConnectionStatus(exchange, connected, message) {
+            const statusEl = document.getElementById(`${exchange}-status`);
+            const textEl = document.getElementById(`${exchange}-status-text`);
+            
+            if (connected) {
+                statusEl.className = 'status-indicator connected';
+                textEl.textContent = message || '已连接';
+            } else {
+                statusEl.className = 'status-indicator disconnected';
+                textEl.textContent = message || '连接断开';
+            }
+        }
+
+        // 更新价格显示
+        function updatePriceDisplay(exchange, data) {
+            document.getElementById(`${exchange}-price`).textContent = formatPrice(data.price);
+            document.getElementById(`${exchange}-latency`).textContent = data.latency ? data.latency + 'ms' : '--';
+            document.getElementById(`${exchange}-mark-price`).textContent = formatPrice(data.markPrice);
+            
+            // 更新买价和卖价，并设置颜色
+            const bidPriceEl = document.getElementById(`${exchange}-bid-price`);
+            const askPriceEl = document.getElementById(`${exchange}-ask-price`);
+            bidPriceEl.textContent = formatPrice(data.bidPrice);
+            askPriceEl.textContent = formatPrice(data.askPrice);
+            bidPriceEl.className = 'quote-price bid';
+            askPriceEl.className = 'quote-price ask';
+            
+            // 计算并显示盘口的名义金额（BTC数量 × 价格），并设置颜色
+            // OKX需要张币转换，币安不需要
+            const bidNotional = exchange === 'okx' ? data.bidPrice * data.bidSize * 0.01 : data.bidPrice * data.bidSize;
+            const askNotional = exchange === 'okx' ? data.askPrice * data.askSize * 0.01 : data.askPrice * data.askSize;
+            const bidSizeEl = document.getElementById(`${exchange}-bid-size`);
+            const askSizeEl = document.getElementById(`${exchange}-ask-size`);
+            bidSizeEl.textContent = `${Math.round(bidNotional).toLocaleString('en-US')} U`;
+            askSizeEl.textContent = `${Math.round(askNotional).toLocaleString('en-US')} U`;
+            bidSizeEl.className = 'quote-notional bid';
+            askSizeEl.className = 'quote-notional ask';
+        }
+
+        // 更新资金费率显示
+        function updateFundingDisplay(exchange, data) {
+            // 显示当前费率
+            document.getElementById(`${exchange}-funding-rate`).textContent = formatFundingRate(data.fundingRate);
+            
+            // 计算年化费率（基于8小时收一次）
+            if (data.fundingRate && !isNaN(data.fundingRate)) {
+                // 8小时 = 8 * 60 * 60 = 28800秒
+                // 一年 = 365 * 24 * 60 * 60 = 31536000秒
+                // 一年有 31536000 / 28800 = 1095次收费
+                const annualRate = data.fundingRate * 1095; // 8小时收一次，一年收1095次
+                document.getElementById(`${exchange}-annual-rate`).textContent = formatFundingRate(annualRate);
+            } else {
+                document.getElementById(`${exchange}-annual-rate`).textContent = '--';
+            }
+        }
+
+        // 更新订单流统计 - 这个函数现在不需要了，因为统计已经移到分析窗口中
+        function updateOrderflowStats(exchange, data) {
+            // 这个函数现在为空，因为统计功能已经移到updateOrderflowAnalysis中
+            // 保留函数定义以避免调用错误
+        }
+
+        // 更新爆仓记录
+        function updateLiquidationsDisplay(exchange, liquidations) {
+            const container = document.getElementById(`${exchange}-liquidations`);
+            const thresholdInput = document.getElementById(`${exchange}-liquidation-threshold`);
+            const threshold = parseFloat(thresholdInput.value) || 0;
+            
+            container.innerHTML = '';
+            
+            // 过滤符合阈值的爆仓
+            const filteredLiquidations = liquidations.filter(liq => {
+                return liq.amount >= threshold;
+            });
+            
+            // 只显示最近10笔符合条件的爆仓
+            const recentLiquidations = filteredLiquidations.slice(-10).reverse();
+            
+            recentLiquidations.forEach(liq => {
+                const liqEl = document.createElement('div');
+                liqEl.className = 'liquidation-item';
+                
+                const directionClass = liq.direction === '多头爆仓' ? 'long' : 'short';
+                const directionText = liq.direction === '多头爆仓' ? '多头爆仓' : '空头爆仓';
+                
+                liqEl.innerHTML = `
+                    <span class="liquidation-direction ${directionClass}">${directionText}</span>
+                    <span class="liquidation-price">${formatPrice(liq.price)}</span>
+                    <span class="liquidation-amount">${Math.round(liq.amount).toLocaleString('en-US')}U</span>
+                    <span class="liquidation-time">${formatTime(liq.timestamp)}</span>
+                `;
+                
+                container.appendChild(liqEl);
+            });
+            
+            // 如果没有符合条件的爆仓，显示提示
+            if (recentLiquidations.length === 0) {
+                const emptyEl = document.createElement('div');
+                emptyEl.className = 'liquidation-empty';
+                emptyEl.textContent = `无大于${threshold}U的爆仓`;
+                container.appendChild(emptyEl);
+            }
+        }
+
+        // 更新成交记录
+        function updateTradesDisplay(exchange, trades) {
+            const container = document.getElementById(`${exchange}-trades`);
+            const thresholdInput = document.getElementById(`${exchange}-trades-threshold`);
+            const threshold = parseFloat(thresholdInput.value) || 0;
+            
+            container.innerHTML = '';
+            
+            // 过滤符合阈值的交易
+            const filteredTrades = trades.filter(trade => {
+                // OKX需要张币转换，币安不需要
+                const notional = exchange === 'okx' ? trade.price * trade.size * 0.01 : trade.price * trade.size;
+                return notional >= threshold;
+            });
+            
+            // 只显示最近10笔符合条件的交易
+            const recentTrades = filteredTrades.slice(-10).reverse();
+            
+            recentTrades.forEach(trade => {
+                const tradeEl = document.createElement('div');
+                tradeEl.className = 'trade-item';
+                
+                const sideClass = trade.side === 'buy' ? 'buy' : 'sell';
+                const sideText = trade.side === 'buy' ? '买' : '卖';
+                // OKX需要张币转换，币安不需要
+                const notional = exchange === 'okx' ? trade.price * trade.size * 0.01 : trade.price * trade.size;
+                
+                tradeEl.innerHTML = `
+                    <span class="trade-side ${sideClass}">${sideText}</span>
+                    <span class="trade-price">${formatPrice(trade.price)}</span>
+                    <span class="trade-size">${formatSize(trade.size)}</span>
+                    <span class="trade-notional">${Math.round(notional).toLocaleString('en-US')}U</span>
+                `;
+                
+                container.appendChild(tradeEl);
+            });
+            
+            // 如果没有符合条件的交易，显示提示
+            if (recentTrades.length === 0) {
+                const emptyEl = document.createElement('div');
+                emptyEl.className = 'trade-empty';
+                emptyEl.textContent = `无大于${threshold}U的交易`;
+                container.appendChild(emptyEl);
+            }
+        }
+
+        // 计算订单流分析
+        function calculateOrderflowAnalysis(exchange, data) {
+            const now = Date.now();
+            const window1Ms = data.window1 * 1000;
+            const window2Ms = data.window2 * 1000;
+            
+            // 过滤符合金额条件的交易
+            const filteredTrades = data.trades.filter(trade => {
+                // OKX需要张币转换，币安不需要
+                const notional = exchange === 'okx' ? trade.price * trade.size * 0.01 : trade.price * trade.size;
+                return notional >= data.amountFilter;
+            });
+            
+            // 计算窗口1（10s）数据
+            const window1Trades = filteredTrades.filter(trade => 
+                now - trade.timestamp <= window1Ms
+            );
+            
+            // 计算窗口2（60s）数据
+            const window2Trades = filteredTrades.filter(trade => 
+                now - trade.timestamp <= window2Ms
+            );
+            
+            // 调试信息
+            if (exchange === 'binance' && window1Trades.length > 0) {
+                console.log(`${exchange} 窗口1交易数:`, window1Trades.length, '总交易数:', data.trades.length, '过滤后:', filteredTrades.length);
+                console.log(`${exchange} 金额过滤条件:`, data.amountFilter, 'U');
+                console.log(`${exchange} 窗口1时间范围:`, window1Ms, 'ms');
+            }
+            
+            // 分析函数
+            function analyzeTrades(trades) {
+                let buyVolume = 0;
+                let sellVolume = 0;
+                let buyCount = 0;
+                let sellCount = 0;
+                
+                trades.forEach(trade => {
+                    // OKX需要张币转换，币安不需要
+                    const notional = exchange === 'okx' ? trade.price * trade.size * 0.01 : trade.price * trade.size;
+                    if (trade.side === 'buy') {
+                        buyVolume += notional;
+                        buyCount++;
+                    } else {
+                        sellVolume += notional;
+                        sellCount++;
+                    }
+                });
+                
+                const totalVolume = buyVolume + sellVolume;
+                const totalCount = buyCount + sellCount;
+                const netFlow = buyVolume - sellVolume;
+                const netCount = buyCount - sellCount;
+                const buyRatio = totalVolume > 0 ? (buyVolume / totalVolume) * 100 : 0;
+                const buyCountRatio = totalCount > 0 ? (buyCount / totalCount) * 100 : 0;
+                
+                return {
+                    netFlow,
+                    netCount,
+                    buyRatio,
+                    buyCountRatio,
+                    totalVolume,
+                    totalCount
+                };
+            }
+            
+            const analysis1 = analyzeTrades(window1Trades);
+            const analysis2 = analyzeTrades(window2Trades);
+            
+            return {
+                window1: analysis1,
+                window2: analysis2
+            };
+        }
+
+        // 更新订单流分析显示
+        function updateOrderflowAnalysis(exchange, data) {
+            const analysis = calculateOrderflowAnalysis(exchange, data);
+            
+            // 更新窗口1数据
+            updateAnalysisWindow(exchange, '10s', analysis.window1);
+            // 更新窗口2数据
+            updateAnalysisWindow(exchange, '60s', analysis.window2);
+        }
+
+        // 更新单个分析窗口
+        function updateAnalysisWindow(exchange, window, analysis) {
+            const suffix = window === '10s' ? '10s' : '60s';
+            
+            // 调试信息
+            if (exchange === 'binance' && window === '10s') {
+                console.log(`更新${exchange} ${window}窗口:`, {
+                    netFlow: analysis.netFlow,
+                    buyRatio: analysis.buyRatio,
+                    totalVolume: analysis.totalVolume,
+                    netCount: analysis.netCount,
+                    buyCountRatio: analysis.buyCountRatio,
+                    totalCount: analysis.totalCount
+                });
+                
+                // 检查关键元素是否存在
+                const keyElements = [
+                    `${exchange}-net-flow-${suffix}`,
+                    `${exchange}-buy-ratio-text-${suffix}`,
+                    `${exchange}-buy-ratio-${suffix}`,
+                    `${exchange}-total-${suffix}`,
+                    `${exchange}-net-count-${suffix}`,
+                    `${exchange}-count-ratio-text-${suffix}`,
+                    `${exchange}-count-ratio-${suffix}`,
+                    `${exchange}-total-count-${suffix}`
+                ];
+                
+                const missingElements = keyElements.filter(id => !document.getElementById(id));
+                if (missingElements.length > 0) {
+                    console.warn(`缺少元素:`, missingElements);
+                }
+            }
+            
+            // 更新净主动流
+            const netFlowEl = document.getElementById(`${exchange}-net-flow-${suffix}`);
+            if (netFlowEl) {
+                const netFlowValue = analysis.netFlow;
+                const sign = netFlowValue >= 0 ? '+' : '';
+                netFlowEl.textContent = `${sign}${Math.round(Math.abs(netFlowValue)).toLocaleString('en-US')} U`;
+                netFlowEl.className = `flow-value ${netFlowValue >= 0 ? 'positive' : 'negative'}`;
+            }
+            
+            // 更新主动买占比
+            const buyRatioTextEl = document.getElementById(`${exchange}-buy-ratio-text-${suffix}`);
+            if (buyRatioTextEl) {
+                const buyRatio = analysis.buyRatio;
+                buyRatioTextEl.textContent = `${buyRatio.toFixed(1)}%`;
+            }
+            
+            // 更新进度条
+            const progressFill = document.getElementById(`${exchange}-buy-ratio-${suffix}`);
+            if (progressFill) {
+                const buyRatio = analysis.buyRatio;
+                progressFill.style.width = `${buyRatio}%`;
+                progressFill.className = `progress-fill ${buyRatio >= 50 ? 'buy-dominant' : 'sell-dominant'}`;
+            }
+            
+            // 更新总成交
+            const totalEl = document.getElementById(`${exchange}-total-${suffix}`);
+            if (totalEl) {
+                totalEl.textContent = `${Math.round(analysis.totalVolume).toLocaleString('en-US')} U`;
+            }
+            
+            // 更新净主动笔数
+            const netCountEl = document.getElementById(`${exchange}-net-count-${suffix}`);
+            if (netCountEl) {
+                const netCountValue = analysis.netCount;
+                netCountEl.textContent = `${netCountValue >= 0 ? '+' : ''}${netCountValue} 笔`;
+                netCountEl.className = `count-value ${netCountValue >= 0 ? 'positive' : 'negative'}`;
+            }
+            
+            // 更新主动笔占比
+            const countRatioTextEl = document.getElementById(`${exchange}-count-ratio-text-${suffix}`);
+            if (countRatioTextEl) {
+                const countRatio = analysis.buyCountRatio;
+                countRatioTextEl.textContent = `${countRatio.toFixed(1)}%`;
+            }
+            
+            // 更新笔数进度条
+            const countProgressFill = document.getElementById(`${exchange}-count-ratio-${suffix}`);
+            if (countProgressFill) {
+                const countRatio = analysis.buyCountRatio;
+                countProgressFill.style.width = `${countRatio}%`;
+                countProgressFill.className = `progress-fill ${countRatio >= 50 ? 'buy-dominant' : 'sell-dominant'}`;
+            }
+            
+            // 更新总笔数
+            const totalCountEl = document.getElementById(`${exchange}-total-count-${suffix}`);
+            if (totalCountEl) {
+                totalCountEl.textContent = analysis.totalCount;
+            }
+        }
+
+        // 更新峰值显示 - 基于盘口数据而不是成交数据
+        function updatePeakDisplay(exchange, data) {
+            const now = Date.now();
+            const delayMs = parseInt(document.getElementById(`${exchange}-delay`).value) || 3000;
+            
+            // 计算当前盘口的名义金额
+            // OKX需要张币转换，币安不需要
+            const currentBidNotional = exchange === 'okx' ? data.bidPrice * data.bidSize * 0.01 : data.bidPrice * data.bidSize;
+            const currentAskNotional = exchange === 'okx' ? data.askPrice * data.askSize * 0.01 : data.askPrice * data.askSize;
+            
+            // 初始化峰值历史记录
+            if (!data.peakHistory) {
+                data.peakHistory = [];
+            }
+            
+            // 添加当前数据到历史记录
+            if (currentBidNotional > 0 && currentAskNotional > 0) {
+                data.peakHistory.push({
+                    ts: now,
+                    bidPrice: data.bidPrice,
+                    bidSize: data.bidSize,
+                    bidNotional: currentBidNotional,
+                    askPrice: data.askPrice,
+                    askSize: data.askSize,
+                    askNotional: currentAskNotional
+                });
+            }
+            
+            // 清理超过停滞时间的旧数据
+            data.peakHistory = data.peakHistory.filter(item => (now - item.ts) <= delayMs);
+            
+            // 如果没有历史数据，显示当前值
+            if (data.peakHistory.length === 0) {
+                const bidPeakEl = document.getElementById(`${exchange}-bid-peak`);
+                const askPeakEl = document.getElementById(`${exchange}-ask-peak`);
+                
+                if (currentBidNotional > 0) {
+                    bidPeakEl.textContent = `${Math.round(currentBidNotional).toLocaleString('en-US')} U`;
+                } else {
+                    bidPeakEl.textContent = '-- N/A U';
+                }
+                
+                if (currentAskNotional > 0) {
+                    askPeakEl.textContent = `${Math.round(currentAskNotional).toLocaleString('en-US')} U`;
+                } else {
+                    askPeakEl.textContent = '-- N/A U';
+                }
+                return;
+            }
+            
+            // 找到Bid和Ask的最大金额记录
+            let maxBidRecord = data.peakHistory[0];
+            let maxAskRecord = data.peakHistory[0];
+            
+            for (const record of data.peakHistory) {
+                if (record.bidNotional > maxBidRecord.bidNotional) {
+                    maxBidRecord = record;
+                }
+                if (record.askNotional > maxAskRecord.askNotional) {
+                    maxAskRecord = record;
+                }
+            }
+            
+            // 更新峰值显示
+            const bidPeakEl = document.getElementById(`${exchange}-bid-peak`);
+            const askPeakEl = document.getElementById(`${exchange}-ask-peak`);
+            
+            // 显示最大买单峰值（BB峰值）
+            if (maxBidRecord.bidNotional > 0) {
+                bidPeakEl.textContent = `${Math.round(maxBidRecord.bidNotional).toLocaleString('en-US')} U`;
+            } else {
+                bidPeakEl.textContent = '-- N/A U';
+            }
+            
+            // 显示最大卖单峰值（BA峰值）
+            if (maxAskRecord.askNotional > 0) {
+                askPeakEl.textContent = `${Math.round(maxAskRecord.askNotional).toLocaleString('en-US')} U`;
+            } else {
+                askPeakEl.textContent = '-- N/A U';
+            }
+        }
+
+        // 币安WebSocket类
+        class BinanceWebSocket {
+            constructor() {
+                this.ws = null;
+                this.reconnectTimer = null;
+                this.isConnected = false;
+            }
+
+            connect() {
+                this.disconnect();
+                
+                const symbol = 'btcusdt';
+                const streams = [
+                    `${symbol}@aggTrade`,
+                    `${symbol}@bookTicker`,
+                    `${symbol}@markPrice@1s`,
+                    `${symbol}@markPrice`,
+                    `${symbol}@forceOrder`
+                ];
+                const wsUrl = `wss://fstream.binance.com/stream?streams=${streams.join('/')}`;
+
+                this.ws = new WebSocket(wsUrl);
+                this.ws.onopen = () => {
+                    console.log('币安WebSocket已连接');
+                    this.isConnected = true;
+                    updateConnectionStatus('binance', true, '已连接');
+                };
+                
+                this.ws.onmessage = (event) => this.handleMessage(event.data);
+                this.ws.onerror = (error) => {
+                    console.error('币安WebSocket错误:', error);
+                    this.isConnected = false;
+                    updateConnectionStatus('binance', false, '连接错误');
+                };
+                
+                this.ws.onclose = () => {
+                    console.log('币安WebSocket连接关闭');
+                    this.isConnected = false;
+                    updateConnectionStatus('binance', false, '连接断开');
+                    this.scheduleReconnect();
+                };
+            }
+
+            handleMessage(raw) {
+                try {
+                    const msg = JSON.parse(raw);
+                    let data = msg;
+                    
+                    if (msg.data) {
+                        data = msg.data;
+                    }
+
+                    const eventTime = data.T || data.E;
+                    const latency = eventTime ? Date.now() - eventTime : null;
+
+                    if (msg.stream) {
+                        if (msg.stream.includes('@aggTrade')) {
+                            // 处理成交数据
+                            const isBuyerMaker = data.m;
+                            const tradeQty = parseFloat(data.q);
+                            const price = parseFloat(data.p);
+                            
+                            binanceData.price = price;
+                            binanceData.latency = latency;
+                            
+                            // 更新成交记录
+                            binanceData.trades.push({
+                                side: isBuyerMaker ? 'sell' : 'buy',
+                                price: price,
+                                size: tradeQty,
+                                timestamp: eventTime || Date.now()
+                            });
+                            
+                            // 限制成交记录数量 - 基于时间保留最近5分钟的数据
+                            const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+                            binanceData.trades = binanceData.trades.filter(trade => trade.timestamp > fiveMinutesAgo);
+                            
+                            // 更新统计 - 使用名义金额而不是数量
+                            const notional = price * tradeQty;
+                            if (isBuyerMaker) {
+                                binanceData.maxSell = Math.max(binanceData.maxSell, notional);
+                            } else {
+                                binanceData.maxBuy = Math.max(binanceData.maxBuy, notional);
+                            }
+                            binanceData.totalVolume += notional;
+                            
+                            updatePriceDisplay('binance', binanceData);
+                            updateTradesDisplay('binance', binanceData.trades);
+                            updateOrderflowStats('binance', binanceData);
+                            updateOrderflowAnalysis('binance', binanceData);
+                            updatePeakDisplay('binance', binanceData);
+                            
+                        } else if (msg.stream.includes('@bookTicker')) {
+                            // 处理盘口数据
+                            binanceData.bidPrice = parseFloat(data.b);
+                            binanceData.askPrice = parseFloat(data.a);
+                            binanceData.bidSize = parseFloat(data.B);
+                            binanceData.askSize = parseFloat(data.A);
+                            
+                            updatePriceDisplay('binance', binanceData);
+                            
+                        } else if (msg.stream.includes('@markPrice')) {
+                            // 处理标记价格和资金费率
+                            if (msg.stream.includes('@markPrice@1s')) {
+                                binanceData.markPrice = parseFloat(data.p);
+                            } else {
+                                binanceData.fundingRate = parseFloat(data.r);
+                                binanceData.nextFundingTime = data.T;
+                                
+                            }
+                            
+                            updatePriceDisplay('binance', binanceData);
+                            updateFundingDisplay('binance', binanceData);
+                        } else if (msg.stream.includes('@forceOrder')) {
+                            // 处理爆仓数据
+                            const order = data.o;
+                            const price = parseFloat(order.ap || order.p);
+                            const qty = parseFloat(order.q || order.l);
+                            const side = order.S;
+                            const amount = price * qty;
+                            
+                            // 只处理BTC相关的爆仓
+                            if (order.s === 'BTCUSDT') {
+                                const direction = side === 'BUY' ? '空头爆仓' : '多头爆仓';
+                                
+                                binanceData.liquidations.push({
+                                    direction: direction,
+                                    price: price,
+                                    amount: amount,
+                                    timestamp: Date.now()
+                                });
+                                
+                                // 限制爆仓记录数量 - 基于时间保留最近10分钟的数据
+                                const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+                                binanceData.liquidations = binanceData.liquidations.filter(liq => liq.timestamp > tenMinutesAgo);
+                                
+                                updateLiquidationsDisplay('binance', binanceData.liquidations);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('处理币安消息错误:', error);
+                }
+            }
+
+            scheduleReconnect() {
+                if (this.reconnectTimer) return;
+                
+                this.reconnectTimer = setTimeout(() => {
+                    console.log('尝试重连币安WebSocket...');
+                    this.reconnectTimer = null;
+                    this.connect();
+                }, 5000);
+            }
+
+            disconnect() {
+                if (this.reconnectTimer) {
+                    clearTimeout(this.reconnectTimer);
+                    this.reconnectTimer = null;
+                }
+                
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                this.isConnected = false;
+            }
+        }
+
+        // OKX WebSocket类
+        class OkxWebSocket {
+            constructor() {
+                this.ws = null;
+                this.pingInterval = null;
+                this.reconnectTimer = null;
+                this.isConnected = false;
+            }
+
+            connect() {
+                this.disconnect();
+                
+                const wsUrl = 'wss://ws.okx.com:8443/ws/v5/public';
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    console.log('OKX WebSocket已连接');
+                    this.isConnected = true;
+                    updateConnectionStatus('okx', true, '已连接');
+                    
+                    this.subscribe();
+                    this.startHeartbeat();
+                };
+                
+                this.ws.onmessage = (event) => this.handleMessage(event);
+                this.ws.onerror = (error) => {
+                    console.error('OKX WebSocket错误:', error);
+                    this.isConnected = false;
+                    updateConnectionStatus('okx', false, '连接错误');
+                };
+                
+                this.ws.onclose = () => {
+                    console.log('OKX WebSocket连接关闭');
+                    this.isConnected = false;
+                    updateConnectionStatus('okx', false, '连接断开');
+                    this.scheduleReconnect();
+                };
+            }
+
+            subscribe() {
+                const symbol = 'BTC-USDT-SWAP';
+                
+                // 订阅行情数据
+                const tickerMsg = {
+                    "op": "subscribe",
+                    "args": [{
+                        "channel": "tickers",
+                        "instId": symbol
+                    }]
+                };
+                
+                // 订阅资金费率
+                const fundingMsg = {
+                    "op": "subscribe",
+                    "args": [{
+                        "channel": "funding-rate",
+                        "instId": symbol
+                    }]
+                };
+                
+                // 订阅标记价格
+                const markPriceMsg = {
+                    "op": "subscribe",
+                    "args": [{
+                        "channel": "mark-price",
+                        "instId": symbol
+                    }]
+                };
+                
+                // 订阅成交数据
+                const tradesMsg = {
+                    "op": "subscribe",
+                    "args": [{
+                        "channel": "trades",
+                        "instId": symbol
+                    }]
+                };
+                
+                // 订阅爆仓数据
+                const liquidationMsg = {
+                    "op": "subscribe",
+                    "args": [{
+                        "channel": "liquidation-orders",
+                        "instType": "SWAP"
+                    }]
+                };
+                
+                this.ws.send(JSON.stringify(tickerMsg));
+                this.ws.send(JSON.stringify(fundingMsg));
+                this.ws.send(JSON.stringify(markPriceMsg));
+                this.ws.send(JSON.stringify(tradesMsg));
+                this.ws.send(JSON.stringify(liquidationMsg));
+            }
+
+            startHeartbeat() {
+                this.pingInterval = setInterval(() => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send('ping');
+                    }
+                }, 15000);
+            }
+
+            handleMessage(event) {
+                try {
+                    if (event.data === 'pong') return;
+                    
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.event === 'subscribe' || data.event === 'error') {
+                        return;
+                    }
+
+                    if (data.arg?.channel === 'tickers' && data.data?.[0]) {
+                        const ticker = data.data[0];
+                        okxData.price = parseFloat(ticker.last);
+                        okxData.bidPrice = parseFloat(ticker.bidPx);
+                        okxData.askPrice = parseFloat(ticker.askPx);
+                        okxData.bidSize = parseFloat(ticker.bidSz);
+                        okxData.askSize = parseFloat(ticker.askSz);
+                        
+                        // 计算OKX延迟 - 使用ticker时间戳
+                        const eventTime = parseInt(ticker.ts) || Date.now();
+                        okxData.latency = Date.now() - eventTime;
+                        
+                        updatePriceDisplay('okx', okxData);
+                        
+                    } else if (data.arg?.channel === 'funding-rate' && data.data?.[0]) {
+                        const fundingData = data.data[0];
+                        okxData.fundingRate = parseFloat(fundingData.fundingRate);
+                        // OKX的时间戳是毫秒，需要转换为正确的格式
+                        okxData.nextFundingTime = parseInt(fundingData.nextFundingTime);
+                        
+                        
+                        updateFundingDisplay('okx', okxData);
+                        
+                    } else if (data.arg?.channel === 'mark-price' && data.data?.[0]) {
+                        const markPriceData = data.data[0];
+                        okxData.markPrice = parseFloat(markPriceData.markPx);
+                        
+                        updatePriceDisplay('okx', okxData);
+                        
+                    } else if (data.arg?.channel === 'trades' && Array.isArray(data.data)) {
+                        // 处理成交数据
+                        data.data.forEach(trade => {
+                            const side = trade.side;
+                            const price = parseFloat(trade.px);
+                            const size = parseFloat(trade.sz);
+                            const timestamp = parseInt(trade.ts);
+                            
+                            okxData.trades.push({
+                                side: side,
+                                price: price,
+                                size: size,
+                                timestamp: timestamp
+                            });
+                            
+                            // 限制成交记录数量 - 基于时间保留最近5分钟的数据
+                            const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+                            okxData.trades = okxData.trades.filter(trade => trade.timestamp > fiveMinutesAgo);
+                            
+                            // 更新统计 - 使用名义金额而不是数量，需要张币转换
+                            const notional = price * size * 0.01; // OKX BTC合约每张=0.01 BTC
+                            if (side === 'sell') {
+                                okxData.maxSell = Math.max(okxData.maxSell, notional);
+                            } else {
+                                okxData.maxBuy = Math.max(okxData.maxBuy, notional);
+                            }
+                            okxData.totalVolume += notional;
+                        });
+                        
+                        updateTradesDisplay('okx', okxData.trades);
+                        updateOrderflowStats('okx', okxData);
+                        updateOrderflowAnalysis('okx', okxData);
+                        updatePeakDisplay('okx', okxData);
+                        
+                    } else if (data.arg?.channel === 'liquidation-orders' && data.data?.[0]) {
+                        // 处理OKX爆仓数据
+                        for (const item of data.data) {
+                            if (item.instId === 'BTC-USDT-SWAP' && item.details) {
+                                for (const detail of item.details) {
+                                    const price = parseFloat(detail.bkPx);
+                                    const size = parseFloat(detail.sz);
+                                    const side = detail.side;
+                                    const posSide = detail.posSide;
+                                    
+                                    // 计算金额（需要转换为实际币数）
+                                    // OKX BTC合约每张=0.01 BTC，所以需要乘以0.01
+                                    const amount = price * size * 0.01;
+                                    
+                                    // 确定方向
+                                    let direction;
+                                    if (side === "sell" && posSide === "long") {
+                                        direction = "多头爆仓";
+                                    } else if (side === "buy" && posSide === "short") {
+                                        direction = "空头爆仓";
+                                    } else {
+                                        continue; // 跳过异常组合
+                                    }
+                                    
+                                    okxData.liquidations.push({
+                                        direction: direction,
+                                        price: price,
+                                        amount: amount,
+                                        timestamp: Date.now()
+                                    });
+                                    
+                                    // 限制爆仓记录数量 - 基于时间保留最近10分钟的数据
+                                    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+                                    okxData.liquidations = okxData.liquidations.filter(liq => liq.timestamp > tenMinutesAgo);
+                                }
+                                
+                                updateLiquidationsDisplay('okx', okxData.liquidations);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('处理OKX消息错误:', error);
+                }
+            }
+
+            scheduleReconnect() {
+                if (this.reconnectTimer) return;
+                
+                this.reconnectTimer = setTimeout(() => {
+                    console.log('尝试重连OKX WebSocket...');
+                    this.reconnectTimer = null;
+                    this.connect();
+                }, 5000);
+            }
+
+            disconnect() {
+                if (this.pingInterval) {
+                    clearInterval(this.pingInterval);
+                    this.pingInterval = null;
+                }
+                
+                if (this.reconnectTimer) {
+                    clearTimeout(this.reconnectTimer);
+                    this.reconnectTimer = null;
+                }
+                
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                this.isConnected = false;
+            }
+        }
+
+        // 初始化
+        function init() {
+            console.log('初始化BTC订单流监控系统...');
+            
+            // 创建WebSocket连接
+            binanceWs = new BinanceWebSocket();
+            okxWs = new OkxWebSocket();
+            
+            // 连接WebSocket
+            binanceWs.connect();
+            okxWs.connect();
+            
+            // 设置资金费率倒计时更新
+            setInterval(() => {
+                updateFundingDisplay('binance', binanceData);
+                updateFundingDisplay('okx', okxData);
+            }, 1000);
+            
+            // 设置订单流分析更新 - 更频繁的更新
+            setInterval(() => {
+                updateOrderflowAnalysis('binance', binanceData);
+                updateOrderflowAnalysis('okx', okxData);
+                updatePeakDisplay('binance', binanceData);
+                updatePeakDisplay('okx', okxData);
+            }, 500); // 改为500ms更新一次
+            
+            // 添加事件监听器
+            setupEventListeners();
+            
+            // 初始化数据更新
+            setTimeout(() => {
+                updateOrderflowAnalysis('binance', binanceData);
+                updateOrderflowAnalysis('okx', okxData);
+                updatePeakDisplay('binance', binanceData);
+                updatePeakDisplay('okx', okxData);
+                console.log('初始化数据更新完成');
+            }, 2000); // 2秒后初始化更新
+            
+            // 强制更新机制 - 每5秒强制更新一次
+            setInterval(() => {
+                updateOrderflowAnalysis('binance', binanceData);
+                updateOrderflowAnalysis('okx', okxData);
+                updatePeakDisplay('binance', binanceData);
+                updatePeakDisplay('okx', okxData);
+            }, 5000);
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 币安控制面板事件
+            document.getElementById('binance-delay').addEventListener('input', (e) => {
+                updatePeakDisplay('binance', binanceData);
+            });
+            
+            document.getElementById('binance-window1').addEventListener('input', (e) => {
+                binanceData.window1 = parseInt(e.target.value) || 10;
+                updateOrderflowAnalysis('binance', binanceData);
+            });
+            
+            document.getElementById('binance-window2').addEventListener('input', (e) => {
+                binanceData.window2 = parseInt(e.target.value) || 60;
+                updateOrderflowAnalysis('binance', binanceData);
+            });
+            
+            document.getElementById('binance-amount-filter').addEventListener('input', (e) => {
+                binanceData.amountFilter = parseFloat(e.target.value) || 900;
+                updateOrderflowAnalysis('binance', binanceData);
+            });
+            
+            // OKX控制面板事件
+            document.getElementById('okx-delay').addEventListener('input', (e) => {
+                updatePeakDisplay('okx', okxData);
+            });
+            
+            document.getElementById('okx-window1').addEventListener('input', (e) => {
+                okxData.window1 = parseInt(e.target.value) || 10;
+                updateOrderflowAnalysis('okx', okxData);
+            });
+            
+            document.getElementById('okx-window2').addEventListener('input', (e) => {
+                okxData.window2 = parseInt(e.target.value) || 60;
+                updateOrderflowAnalysis('okx', okxData);
+            });
+            
+            document.getElementById('okx-amount-filter').addEventListener('input', (e) => {
+                okxData.amountFilter = parseFloat(e.target.value) || 900;
+                updateOrderflowAnalysis('okx', okxData);
+            });
+            
+            // 成交阈值事件
+            document.getElementById('binance-trades-threshold').addEventListener('input', (e) => {
+                updateTradesDisplay('binance', binanceData.trades);
+            });
+            
+            document.getElementById('okx-trades-threshold').addEventListener('input', (e) => {
+                updateTradesDisplay('okx', okxData.trades);
+            });
+            
+            // 爆仓阈值事件
+            document.getElementById('binance-liquidation-threshold').addEventListener('input', (e) => {
+                updateLiquidationsDisplay('binance', binanceData.liquidations);
+            });
+            
+            document.getElementById('okx-liquidation-threshold').addEventListener('input', (e) => {
+                updateLiquidationsDisplay('okx', okxData.liquidations);
+            });
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+
+        // 页面卸载时清理连接
+        window.addEventListener('beforeunload', () => {
+            if (binanceWs) binanceWs.disconnect();
+            if (okxWs) okxWs.disconnect();
+        });
+    </script>
+</body>
+</html>
